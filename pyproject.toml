@@ -1,0 +1,11 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+norecursedirs = [".git", "tmp", "custom_components"]
+
+[tool.coverage.run]
+source = ["custom_components/vesync"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 50
