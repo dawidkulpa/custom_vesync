@@ -1,7 +1,7 @@
 """Tests for VeSync integration setup and teardown."""
 
 from datetime import timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -64,8 +64,10 @@ class TestAsyncSetupEntry:
             ) as mock_process,
         ):
             manager = mock_vesync_class.return_value
-            manager.login = MagicMock(return_value=True)
-            manager.update = MagicMock()
+            manager.__aenter__ = AsyncMock(return_value=manager)
+            manager.__aexit__ = AsyncMock(return_value=False)
+            manager.login = AsyncMock(return_value=True)
+            manager.update = AsyncMock()
 
             mock_process.return_value = {
                 VS_SWITCHES: [],
@@ -91,7 +93,9 @@ class TestAsyncSetupEntry:
 
         with patch("custom_components.vesync.VeSync") as mock_vesync_class:
             manager = mock_vesync_class.return_value
-            manager.login = MagicMock(return_value=False)
+            manager.__aenter__ = AsyncMock(return_value=manager)
+            manager.__aexit__ = AsyncMock(return_value=False)
+            manager.login = AsyncMock(return_value=False)
 
             result = await async_setup_entry(hass, entry)
 
@@ -108,8 +112,10 @@ class TestAsyncSetupEntry:
             ) as mock_process,
         ):
             manager = mock_vesync_class.return_value
-            manager.login = MagicMock(return_value=True)
-            manager.update = MagicMock()
+            manager.__aenter__ = AsyncMock(return_value=manager)
+            manager.__aexit__ = AsyncMock(return_value=False)
+            manager.login = AsyncMock(return_value=True)
+            manager.update = AsyncMock()
 
             mock_process.return_value = {
                 VS_SWITCHES: [],
@@ -137,8 +143,10 @@ class TestAsyncSetupEntry:
             ) as mock_process,
         ):
             manager = mock_vesync_class.return_value
-            manager.login = MagicMock(return_value=True)
-            manager.update = MagicMock(side_effect=RuntimeError("Connection error"))
+            manager.__aenter__ = AsyncMock(return_value=manager)
+            manager.__aexit__ = AsyncMock(return_value=False)
+            manager.login = AsyncMock(return_value=True)
+            manager.update = AsyncMock(side_effect=RuntimeError("Connection error"))
 
             mock_process.return_value = {
                 VS_SWITCHES: [],
@@ -170,8 +178,10 @@ class TestAsyncSetupEntry:
             ) as mock_process,
         ):
             manager = mock_vesync_class.return_value
-            manager.login = MagicMock(return_value=True)
-            manager.update = MagicMock()
+            manager.__aenter__ = AsyncMock(return_value=manager)
+            manager.__aexit__ = AsyncMock(return_value=False)
+            manager.login = AsyncMock(return_value=True)
+            manager.update = AsyncMock()
 
             mock_process.return_value = {
                 VS_SWITCHES: [],
@@ -206,8 +216,10 @@ class TestAsyncSetupEntry:
             ) as mock_forward,
         ):
             manager = mock_vesync_class.return_value
-            manager.login = MagicMock(return_value=True)
-            manager.update = MagicMock()
+            manager.__aenter__ = AsyncMock(return_value=manager)
+            manager.__aexit__ = AsyncMock(return_value=False)
+            manager.login = AsyncMock(return_value=True)
+            manager.update = AsyncMock()
 
             mock_process.return_value = {
                 VS_SWITCHES: [mock_device],
@@ -240,8 +252,10 @@ class TestAsyncSetupEntry:
             ) as mock_process,
         ):
             manager = mock_vesync_class.return_value
-            manager.login = MagicMock(return_value=True)
-            manager.update = MagicMock()
+            manager.__aenter__ = AsyncMock(return_value=manager)
+            manager.__aexit__ = AsyncMock(return_value=False)
+            manager.login = AsyncMock(return_value=True)
+            manager.update = AsyncMock()
 
             mock_process.return_value = {
                 VS_SWITCHES: [],
@@ -269,8 +283,10 @@ class TestAsyncSetupEntry:
             ) as mock_process,
         ):
             manager = mock_vesync_class.return_value
-            manager.login = MagicMock(return_value=True)
-            manager.update = MagicMock()
+            manager.__aenter__ = AsyncMock(return_value=manager)
+            manager.__aexit__ = AsyncMock(return_value=False)
+            manager.login = AsyncMock(return_value=True)
+            manager.update = AsyncMock()
 
             mock_process.return_value = {
                 VS_SWITCHES: [],
@@ -289,7 +305,8 @@ class TestAsyncSetupEntry:
         mock_vesync_class.assert_called_once_with(
             "test@example.com",
             "test_password",
-            str(hass.config.time_zone),
+            time_zone=str(hass.config.time_zone),
+            session=ANY,
         )
 
 
@@ -306,7 +323,9 @@ class TestAsyncUnloadEntry:
         entry = _make_config_entry(hass)
 
         # Prepopulate hass.data as if setup had run
-        hass.data[DOMAIN] = {entry.entry_id: {"some": "data"}}
+        manager = MagicMock()
+        manager.__aexit__ = AsyncMock(return_value=False)
+        hass.data[DOMAIN] = {entry.entry_id: {"some": "data", "manager": manager}}
 
         with patch.object(
             hass.config_entries,
@@ -362,8 +381,10 @@ class TestAddNewDevicesBugFix:
             patch("custom_components.vesync.async_dispatcher_send") as mock_dispatch,
         ):
             manager = mock_vesync_class.return_value
-            manager.login = MagicMock(return_value=True)
-            manager.update = MagicMock()
+            manager.__aenter__ = AsyncMock(return_value=manager)
+            manager.__aexit__ = AsyncMock(return_value=False)
+            manager.login = AsyncMock(return_value=True)
+            manager.update = AsyncMock()
 
             # Initial setup with no devices
             mock_process.return_value = {

@@ -97,17 +97,17 @@ class TestVeSyncHumidifierHA:
 
     def test_mode(self, humidifier_entity, mock_humidifier_device):
         """Return current mode mapped to HA."""
-        mock_humidifier_device.details = {"mode": "auto"}
+        mock_humidifier_device.state.mode = "auto"
         assert humidifier_entity.mode == MODE_AUTO
 
     def test_is_on(self, humidifier_entity, mock_humidifier_device):
         """Return enabled state from device."""
-        mock_humidifier_device.enabled = True
+        mock_humidifier_device.is_on = True
         assert humidifier_entity.is_on is True
 
     def test_is_off(self, humidifier_entity, mock_humidifier_device):
         """Return False when device is disabled."""
-        mock_humidifier_device.enabled = False
+        mock_humidifier_device.is_on = False
         assert humidifier_entity.is_on is False
 
     def test_available_modes(self, humidifier_entity, mock_humidifier_device):
@@ -117,69 +117,69 @@ class TestVeSyncHumidifierHA:
         assert MODE_NORMAL in modes
         assert MODE_SLEEP in modes
 
-    def test_set_humidity_valid(self, humidifier_entity, mock_humidifier_device):
+    async def test_set_humidity_valid(self, humidifier_entity, mock_humidifier_device):
         """Set humidity within valid range."""
-        humidifier_entity.set_humidity(50)
+        await humidifier_entity.async_set_humidity(50)
         mock_humidifier_device.set_humidity.assert_called_once_with(50)
 
-    def test_set_humidity_out_of_range(self, humidifier_entity):
+    async def test_set_humidity_out_of_range(self, humidifier_entity):
         """Raise ValueError for humidity outside valid range."""
         with pytest.raises(ValueError):
-            humidifier_entity.set_humidity(10)
+            await humidifier_entity.async_set_humidity(10)
 
-    def test_set_humidity_device_failure(self, humidifier_entity, mock_humidifier_device):
+    async def test_set_humidity_device_failure(self, humidifier_entity, mock_humidifier_device):
         """Raise ValueError when device returns failure."""
         mock_humidifier_device.set_humidity.return_value = False
         with pytest.raises(ValueError, match="error occurred"):
-            humidifier_entity.set_humidity(50)
+            await humidifier_entity.async_set_humidity(50)
 
-    def test_set_mode_auto(self, humidifier_entity, mock_humidifier_device):
+    async def test_set_mode_auto(self, humidifier_entity, mock_humidifier_device):
         """Set mode to auto."""
-        humidifier_entity.set_mode(MODE_AUTO)
-        mock_humidifier_device.set_humidity_mode.assert_called_once()
+        await humidifier_entity.async_set_mode(MODE_AUTO)
+        mock_humidifier_device.set_mode.assert_called_once()
 
-    def test_set_mode_invalid(self, humidifier_entity):
+    async def test_set_mode_invalid(self, humidifier_entity):
         """Raise ValueError for invalid mode."""
         with pytest.raises(ValueError):
-            humidifier_entity.set_mode("turbo")
+            await humidifier_entity.async_set_mode("turbo")
 
-    def test_set_mode_device_failure(self, humidifier_entity, mock_humidifier_device):
-        """Raise ValueError when set_humidity_mode returns failure."""
-        mock_humidifier_device.set_humidity_mode.return_value = False
+    async def test_set_mode_device_failure(self, humidifier_entity, mock_humidifier_device):
+        """Raise ValueError when set_mode returns failure."""
+        mock_humidifier_device.set_mode.return_value = False
         with pytest.raises(ValueError, match="error occurred"):
-            humidifier_entity.set_mode(MODE_AUTO)
+            await humidifier_entity.async_set_mode(MODE_AUTO)
 
-    def test_turn_on(self, humidifier_entity, mock_humidifier_device):
+    async def test_turn_on(self, humidifier_entity, mock_humidifier_device):
         """Turn on the humidifier."""
         mock_humidifier_device.turn_on.return_value = True
-        humidifier_entity.turn_on()
+        await humidifier_entity.async_turn_on()
         mock_humidifier_device.turn_on.assert_called_once()
 
-    def test_turn_on_failure(self, humidifier_entity, mock_humidifier_device):
+    async def test_turn_on_failure(self, humidifier_entity, mock_humidifier_device):
         """Raise ValueError when turn_on fails."""
         mock_humidifier_device.turn_on.return_value = False
         with pytest.raises(ValueError, match="error occurred"):
-            humidifier_entity.turn_on()
+            await humidifier_entity.async_turn_on()
 
-    def test_turn_off(self, humidifier_entity, mock_humidifier_device):
+    async def test_turn_off(self, humidifier_entity, mock_humidifier_device):
         """Turn off the humidifier."""
         mock_humidifier_device.turn_off.return_value = True
-        humidifier_entity.turn_off()
+        await humidifier_entity.async_turn_off()
         mock_humidifier_device.turn_off.assert_called_once()
 
-    def test_turn_off_failure(self, humidifier_entity, mock_humidifier_device):
+    async def test_turn_off_failure(self, humidifier_entity, mock_humidifier_device):
         """Raise ValueError when turn_off fails."""
         mock_humidifier_device.turn_off.return_value = False
         with pytest.raises(ValueError, match="error occurred"):
-            humidifier_entity.turn_off()
+            await humidifier_entity.async_turn_off()
 
     def test_extra_state_attributes(self, humidifier_entity, mock_humidifier_device):
         """Return mapped extra state attributes."""
-        mock_humidifier_device.details = {
+        mock_humidifier_device.state.to_dict = MagicMock(return_value={
             "humidity": 55,
             "mode": "auto",
             "mist_level": 3,
-        }
+        })
         attrs = humidifier_entity.extra_state_attributes
         # humidity gets remapped to current_humidity
         assert "current_humidity" in attrs

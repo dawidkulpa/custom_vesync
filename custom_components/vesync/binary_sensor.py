@@ -45,7 +45,7 @@ def _setup_entities(devices, async_add_entities, coordinator):
     """Check if device is online and add entity."""
     entities = []
     for dev in devices:
-        if hasattr(dev, "fryer_status"):
+        if dev.product_type == "airfryer":
             for stype in BINARY_SENSOR_TYPES_AIRFRYER.values():
                 entities.append(  # noqa: PERF401
                     VeSyncairfryerSensor(
@@ -54,11 +54,11 @@ def _setup_entities(devices, async_add_entities, coordinator):
                         stype,
                     )
                 )
-        if has_feature(dev, "details", "water_lacks"):
+        if has_feature(dev, "water_lacks"):
             entities.append(VeSyncOutOfWaterSensor(dev, coordinator))
-        if has_feature(dev, "details", "water_tank_lifted"):
+        if has_feature(dev, "water_tank_lifted"):
             entities.append(VeSyncWaterTankLiftedSensor(dev, coordinator))
-        if has_feature(dev, "details", "filter_open_state"):
+        if has_feature(dev, "filter_open_state"):
             entities.append(VeSyncFilterOpenStateSensor(dev, coordinator))
 
     async_add_entities(entities, update_before_add=True)
@@ -91,8 +91,7 @@ class VeSyncairfryerSensor(VeSyncBaseEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return a value indicating whether the Humidifier's water tank is lifted."""
-        return getattr(self.airfryer, self.stype[0], None)
-        # return self.smarthumidifier.details["water_tank_lifted"]
+        return getattr(self.airfryer.state, self.stype[0], None)
 
     @property
     def icon(self):
@@ -130,7 +129,7 @@ class VeSyncOutOfWaterSensor(VeSyncBinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return a value indicating whether the Humidifier is out of water."""
-        return self.smarthumidifier.details["water_lacks"]
+        return self.smarthumidifier.state.water_lacks
 
 
 class VeSyncWaterTankLiftedSensor(VeSyncBinarySensorEntity):
@@ -149,7 +148,7 @@ class VeSyncWaterTankLiftedSensor(VeSyncBinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return a value indicating whether the Humidifier's water tank is lifted."""
-        return self.smarthumidifier.details["water_tank_lifted"]
+        return self.smarthumidifier.state.water_tank_lifted
 
 
 class VeSyncFilterOpenStateSensor(VeSyncBinarySensorEntity):
@@ -168,4 +167,4 @@ class VeSyncFilterOpenStateSensor(VeSyncBinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return a value indicating whether the Humidifier's filter is open."""
-        return self.smarthumidifier.details["filter_open_state"]
+        return self.smarthumidifier.state.filter_open_state

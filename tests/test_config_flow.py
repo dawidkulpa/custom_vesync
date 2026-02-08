@@ -1,6 +1,6 @@
 """Tests for VeSync config flow."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -39,8 +39,10 @@ class TestConfigFlow:
             "custom_components.vesync.config_flow.VeSync"
         ) as mock_vesync_class:
             instance = mock_vesync_class.return_value
-            instance.login = MagicMock(return_value=True)
+            instance.login = AsyncMock(return_value=True)
             instance.account_id = "test-account-id"
+            instance.__aenter__ = AsyncMock(return_value=instance)
+            instance.__aexit__ = AsyncMock(return_value=False)
 
             result = await hass.config_entries.flow.async_init(
                 DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -65,8 +67,10 @@ class TestConfigFlow:
             "custom_components.vesync.config_flow.VeSync"
         ) as mock_vesync_class:
             instance = mock_vesync_class.return_value
-            instance.login = MagicMock(return_value=False)
+            instance.login = AsyncMock(return_value=False)
             instance.account_id = "test-account-id"
+            instance.__aenter__ = AsyncMock(return_value=instance)
+            instance.__aexit__ = AsyncMock(return_value=False)
 
             result = await hass.config_entries.flow.async_init(
                 DOMAIN, context={"source": config_entries.SOURCE_USER}
@@ -88,8 +92,10 @@ class TestConfigFlow:
             "custom_components.vesync.config_flow.VeSync"
         ) as mock_vesync_class:
             instance = mock_vesync_class.return_value
-            instance.login = MagicMock(return_value=True)
+            instance.login = AsyncMock(return_value=True)
             instance.account_id = "test-account-id"
+            instance.__aenter__ = AsyncMock(return_value=instance)
+            instance.__aexit__ = AsyncMock(return_value=False)
 
             # Create first entry
             result = await hass.config_entries.flow.async_init(

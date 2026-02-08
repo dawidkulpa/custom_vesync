@@ -50,11 +50,11 @@ def _setup_entities(devices, async_add_entities, coordinator):
             entities.append(VeSyncLightSwitch(dev, coordinator))
         if getattr(dev, "set_auto_mode", None):
             entities.append(VeSyncHumidifierAutoOnHA(dev, coordinator))
-        if getattr(dev, "automatic_stop_on", None):
+        if getattr(dev, "turn_on_automatic_stop", None):
             entities.append(VeSyncHumidifierAutomaticStopHA(dev, coordinator))
         if getattr(dev, "turn_on_display", None):
             entities.append(VeSyncHumidifierDisplayHA(dev, coordinator))
-        if getattr(dev, "child_lock_on", None):
+        if getattr(dev, "turn_on_child_lock", None):
             entities.append(VeSyncFanChildLockHA(dev, coordinator))
 
     async_add_entities(entities, update_before_add=True)
@@ -67,9 +67,9 @@ class VeSyncBaseSwitch(VeSyncDevice, SwitchEntity):
         """Initialize the VeSync outlet device."""
         super().__init__(plug, coordinator)
 
-    def turn_on(self, **kwargs):
+    async def async_turn_on(self, **kwargs):
         """Turn the device on."""
-        self.device.turn_on()
+        await self.device.turn_on()
 
 
 class VeSyncSwitchHA(VeSyncBaseSwitch, SwitchEntity):
@@ -83,21 +83,19 @@ class VeSyncSwitchHA(VeSyncBaseSwitch, SwitchEntity):
     @property
     def extra_state_attributes(self):
         """Return the state attributes of the device."""
-        return (
-            {
-                "voltage": self.smartplug.voltage,
-                "weekly_energy_total": self.smartplug.weekly_energy_total,
-                "monthly_energy_total": self.smartplug.monthly_energy_total,
-                "yearly_energy_total": self.smartplug.yearly_energy_total,
+        if hasattr(self.smartplug.state, "weekly_history"):
+            return {
+                "voltage": self.smartplug.state.voltage,
+                "weekly_energy_total": self.smartplug.state.weekly_history,
+                "monthly_energy_total": self.smartplug.state.monthly_history,
+                "yearly_energy_total": self.smartplug.state.yearly_history,
             }
-            if hasattr(self.smartplug, "weekly_energy_total")
-            else {}
-        )
+        return {}
 
-    def update(self):
+    async def async_update(self):
         """Update outlet details and energy usage."""
-        self.smartplug.update()
-        self.smartplug.update_energy()
+        await self.smartplug.update()
+        await self.smartplug.update_energy()
 
 
 class VeSyncLightSwitch(VeSyncBaseSwitch, SwitchEntity):
@@ -143,19 +141,19 @@ class VeSyncFanChildLockHA(VeSyncSwitchEntity):
     @property
     def is_on(self):
         """Return True if it is locked."""
-        return self.device.details["child_lock"]
+        return self.device.state.child_lock
 
-    def turn_on(self, **kwargs):
+    async def async_turn_on(self, **kwargs):
         """Turn the lock on."""
-        self.device.child_lock_on()
+        await self.device.turn_on_child_lock()
 
-    def turn_off(self, **kwargs):
+    async def async_turn_off(self, **kwargs):
         """Turn the lock off."""
-        self.device.child_lock_off()
+        await self.device.turn_off_child_lock()
 
 
 class VeSyncHumidifierDisplayHA(VeSyncSwitchEntity):
-    """Representation of the child lock switch."""
+    """Representation of the display switch."""
 
     def __init__(self, lock, coordinator) -> None:
         """Initialize the VeSync outlet device."""
@@ -173,16 +171,16 @@ class VeSyncHumidifierDisplayHA(VeSyncSwitchEntity):
 
     @property
     def is_on(self):
-        """Return True if it is locked."""
-        return self.device.details["display"]
+        """Return True if display is on."""
+        return self.device.state.display_status
 
-    def turn_on(self, **kwargs):
-        """Turn the lock on."""
-        self.device.turn_on_display()
+    async def async_turn_on(self, **kwargs):
+        """Turn the display on."""
+        await self.device.turn_on_display()
 
-    def turn_off(self, **kwargs):
-        """Turn the lock off."""
-        self.device.turn_off_display()
+    async def async_turn_off(self, **kwargs):
+        """Turn the display off."""
+        await self.device.turn_off_display()
 
 
 class VeSyncHumidifierAutomaticStopHA(VeSyncSwitchEntity):
@@ -205,15 +203,15 @@ class VeSyncHumidifierAutomaticStopHA(VeSyncSwitchEntity):
     @property
     def is_on(self):
         """Return True if automatic stop is on."""
-        return self.device.config["automatic_stop"]
+        return self.device.state.automatic_stop
 
-    def turn_on(self, **kwargs):
+    async def async_turn_on(self, **kwargs):
         """Turn the automatic stop on."""
-        self.device.automatic_stop_on()
+        await self.device.turn_on_automatic_stop()
 
-    def turn_off(self, **kwargs):
+    async def async_turn_off(self, **kwargs):
         """Turn the automatic stop off."""
-        self.device.automatic_stop_off()
+        await self.device.turn_off_automatic_stop()
 
 
 class VeSyncHumidifierAutoOnHA(VeSyncSwitchEntity):
@@ -236,13 +234,13 @@ class VeSyncHumidifierAutoOnHA(VeSyncSwitchEntity):
     @property
     def is_on(self):
         """Return True if in auto mode."""
-        return self.device.details["mode"] == "auto"
+        return self.device.state.mode == "auto"
 
-    def turn_on(self, **kwargs):
+    async def async_turn_on(self, **kwargs):
         """Turn auto mode on."""
-        self.device.set_auto_mode()
+        await self.device.set_auto_mode()
 
-    def turn_off(self, **kwargs):
+    async def async_turn_off(self, **kwargs):
         """Turn auto off by setting manual and mist level 1."""
-        self.device.set_manual_mode()
-        self.device.set_mist_level(1)
+        await self.device.set_manual_mode()
+        await self.device.set_mist_level(1)

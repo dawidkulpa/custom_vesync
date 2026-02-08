@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -50,12 +51,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     password = config_entry.data[CONF_PASSWORD]
 
     time_zone = str(hass.config.time_zone)
+    session = async_get_clientsession(hass)
 
-    manager = VeSync(username, password, time_zone)
+    manager = VeSync(username, password, time_zone=time_zone, session=session)
+    await manager.__aenter__()
 
-    login = await hass.async_add_executor_job(manager.login)
+    login = await manager.login()
 
     if not login:
+        await manager.__aexit__(None, None, None)
         _LOGGER.error("Unable to login to the VeSync server")
         return False
 
@@ -66,7 +70,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     async def async_update_data():
         """Fetch data from API endpoint."""
         try:
-            await hass.async_add_executor_job(manager.update)
+            await manager.update()
         except Exception as err:
             raise UpdateFailed(f"Update failed: {err}") from err
 
@@ -137,6 +141,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry, list(PLATFORMS.keys())
     )
     if unload_ok:
+        manager = hass.data[DOMAIN][entry.entry_id].get(VS_MANAGER)
+        if manager is not None:
+            await manager.__aexit__(None, None, None)
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok

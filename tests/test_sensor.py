@@ -1,6 +1,6 @@
 """Tests for VeSync sensor platform."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -34,8 +34,8 @@ from custom_components.vesync.sensor import (
 # ---------------------------------------------------------------------------
 
 
-def _make_purifier_device(**detail_overrides):
-    """Return a mock purifier device with customizable details."""
+def _make_purifier_device(**state_overrides):
+    """Return a mock purifier device with customizable state attributes."""
     device = MagicMock()
     device.cid = "purifier-cid"
     device.sub_device_no = None
@@ -43,7 +43,11 @@ def _make_purifier_device(**detail_overrides):
     device.device_type = "LAP-C201S"
     device.connection_status = "online"
     device.current_firm_version = "1.0"
-    device.details = detail_overrides
+    # Use spec=[] so only explicitly set attributes exist on state
+    state = MagicMock(spec=[])
+    for k, v in state_overrides.items():
+        setattr(state, k, v)
+    device.state = state
     return device
 
 
@@ -154,15 +158,7 @@ class TestVeSyncAirQualitySensor:
     @pytest.fixture
     def aq_device(self, mock_coordinator):
         """Return a device with air quality details."""
-        device = MagicMock()
-        device.cid = "aq-cid"
-        device.sub_device_no = None
-        device.device_name = "Purifier"
-        device.device_type = "LAP-C201S"
-        device.connection_status = "online"
-        device.current_firm_version = "1.0"
-        device.details = {"air_quality": 3}
-        return device
+        return _make_purifier_device(air_quality=3)
 
     @pytest.fixture
     def aq_sensor(self, aq_device, mock_coordinator):
@@ -179,14 +175,7 @@ class TestVeSyncAirQualitySensor:
 
     def test_non_numeric_value_returns_none(self, mock_coordinator):
         """Return None for non-numeric air quality values."""
-        device = MagicMock()
-        device.cid = "aq-cid"
-        device.sub_device_no = None
-        device.device_name = "Purifier"
-        device.device_type = "LAP-C201S"
-        device.connection_status = "online"
-        device.current_firm_version = "1.0"
-        device.details = {"air_quality": "good"}
+        device = _make_purifier_device(air_quality="good")
         sensor = VeSyncAirQualitySensor(device, mock_coordinator)
         assert sensor.native_value is None
 
@@ -197,14 +186,7 @@ class TestVeSyncAirQualityValueSensor:
     @pytest.fixture
     def pm25_sensor(self, mock_coordinator):
         """Return a PM2.5 sensor entity."""
-        device = MagicMock()
-        device.cid = "pm25-cid"
-        device.sub_device_no = None
-        device.device_name = "Purifier"
-        device.device_type = "LAP-C201S"
-        device.connection_status = "online"
-        device.current_firm_version = "1.0"
-        device.details = {"air_quality_value": 12}
+        device = _make_purifier_device(air_quality_value=12)
         return VeSyncAirQualityValueSensor(device, mock_coordinator)
 
     def test_device_class(self, pm25_sensor):
@@ -226,15 +208,7 @@ class TestVeSyncFilterLifeSensor:
     @pytest.fixture
     def filter_sensor(self, mock_coordinator):
         """Return a filter life sensor entity."""
-        device = MagicMock()
-        device.cid = "filter-cid"
-        device.sub_device_no = None
-        device.device_name = "Purifier"
-        device.device_type = "LAP-C201S"
-        device.connection_status = "online"
-        device.current_firm_version = "1.0"
-        device.filter_life = 85
-        device.details = {"filter_life": 85}
+        device = _make_purifier_device(filter_life=85)
         return VeSyncFilterLifeSensor(device, mock_coordinator)
 
     def test_unique_id_suffix(self, filter_sensor):
@@ -289,10 +263,10 @@ class TestVeSyncAirfryerSensor:
 class TestVeSyncPowerSensorUpdate:
     """Tests for VeSyncPowerSensor.update."""
 
-    def test_update_calls_device_methods(self, mock_outlet_device, mock_coordinator):
+    async def test_update_calls_device_methods(self, mock_outlet_device, mock_coordinator):
         """Call update and update_energy on the underlying device."""
         sensor = VeSyncPowerSensor(mock_outlet_device, mock_coordinator)
-        sensor.update()
+        await sensor.async_update()
         mock_outlet_device.update.assert_called_once()
         mock_outlet_device.update_energy.assert_called_once()
 
@@ -300,10 +274,10 @@ class TestVeSyncPowerSensorUpdate:
 class TestVeSyncEnergySensorUpdate:
     """Tests for VeSyncEnergySensor.update."""
 
-    def test_update_calls_device_methods(self, mock_outlet_device, mock_coordinator):
+    async def test_update_calls_device_methods(self, mock_outlet_device, mock_coordinator):
         """Call update and update_energy on the underlying device."""
         sensor = VeSyncEnergySensor(mock_outlet_device, mock_coordinator)
-        sensor.update()
+        await sensor.async_update()
         mock_outlet_device.update.assert_called_once()
         mock_outlet_device.update_energy.assert_called_once()
 
@@ -486,7 +460,6 @@ class TestVeSyncFanRotateAngleSensor:
     def angle_sensor(self, mock_coordinator):
         """Return a fan rotate angle sensor entity."""
         device = _make_purifier_device(fan_rotate_angle=90)
-        device.fan_rotate_angle = 90
         return VeSyncFanRotateAngleSensor(device, mock_coordinator)
 
     def test_unique_id_suffix(self, angle_sensor):
@@ -529,14 +502,12 @@ class TestVeSyncFilterLifeSensorEdgeCases:
     def test_state_class(self, mock_coordinator):
         """Return MEASUREMENT state class."""
         device = _make_purifier_device(filter_life=80)
-        device.filter_life = 80
         sensor = VeSyncFilterLifeSensor(device, mock_coordinator)
         assert sensor.state_class == SensorStateClass.MEASUREMENT
 
     def test_device_class_is_none(self, mock_coordinator):
         """Return None device class."""
         device = _make_purifier_device(filter_life=80)
-        device.filter_life = 80
         sensor = VeSyncFilterLifeSensor(device, mock_coordinator)
         assert sensor.device_class is None
 
@@ -545,41 +516,25 @@ class TestVeSyncFilterLifeSensorEdgeCases:
         from homeassistant.helpers.entity import EntityCategory
 
         device = _make_purifier_device(filter_life=80)
-        device.filter_life = 80
         sensor = VeSyncFilterLifeSensor(device, mock_coordinator)
         assert sensor.entity_category == EntityCategory.DIAGNOSTIC
 
-    def test_state_attributes_dict(self, mock_coordinator):
-        """Return filter_life dict as state attributes."""
+    def test_state_attributes_always_empty(self, mock_coordinator):
+        """Return empty dict for state attributes."""
         device = _make_purifier_device(filter_life={"pct": 80, "hours": 100})
-        device.filter_life = 80
         sensor = VeSyncFilterLifeSensor(device, mock_coordinator)
-        assert sensor.state_attributes == {"pct": 80, "hours": 100}
+        assert sensor.state_attributes == {}
 
     def test_state_attributes_non_dict(self, mock_coordinator):
         """Return empty dict when filter_life is not a dict."""
         device = _make_purifier_device(filter_life=80)
-        device.filter_life = 80
         sensor = VeSyncFilterLifeSensor(device, mock_coordinator)
         assert sensor.state_attributes == {}
 
-    def test_native_value_fallback_to_details(self, mock_coordinator):
-        """Fall back to details dict when filter_life attr is missing."""
+    def test_native_value_from_state(self, mock_coordinator):
+        """Return filter_life from device state."""
         device = _make_purifier_device(filter_life=70)
-        # Remove the filter_life attribute to trigger the fallback
-        if hasattr(device, "filter_life"):
-            del device.filter_life
-        # MagicMock needs spec exclusion; use hasattr check in code
-        device.configure_mock(**{"filter_life": MagicMock(side_effect=AttributeError)})
-        # Directly set so hasattr returns False
-        device_no_attr = _make_purifier_device(filter_life=70)
-        type(device_no_attr).filter_life = property(
-            lambda self: (_ for _ in ()).throw(AttributeError)
-        )
-        # Actually the code uses hasattr, so let's just test with the attr present
-        device2 = _make_purifier_device(filter_life=70)
-        device2.filter_life = 70
-        sensor = VeSyncFilterLifeSensor(device2, mock_coordinator)
+        sensor = VeSyncFilterLifeSensor(device, mock_coordinator)
         assert sensor.native_value == 70
 
 

@@ -62,7 +62,7 @@ def _setup_entities(devices, async_add_entities, coordinator):
     """Check if device is online and add entity."""
     entities = []
     for dev in devices:
-        if hasattr(dev, "fryer_status"):
+        if dev.product_type == "airfryer":
             for stype in SENSOR_TYPES_AIRFRYER.values():
                 entities.append(  # noqa: PERF401
                     VeSyncairfryerSensor(
@@ -79,21 +79,21 @@ def _setup_entities(devices, async_add_entities, coordinator):
                     VeSyncEnergySensor(dev, coordinator),
                 )
             )
-        if has_feature(dev, "details", "humidity"):
+        if has_feature(dev, "humidity"):
             entities.append(VeSyncHumiditySensor(dev, coordinator))
-        if has_feature(dev, "details", "air_quality"):
+        if has_feature(dev, "air_quality"):
             entities.append(VeSyncAirQualitySensor(dev, coordinator))
-        if has_feature(dev, "details", "aq_percent"):
+        if has_feature(dev, "aq_percent"):
             entities.append(VeSyncAirQualityPercSensor(dev, coordinator))
-        if has_feature(dev, "details", "air_quality_value"):
+        if has_feature(dev, "air_quality_value"):
             entities.append(VeSyncAirQualityValueSensor(dev, coordinator))
-        if has_feature(dev, "details", "pm1"):
+        if has_feature(dev, "pm1"):
             entities.append(VeSyncPM1Sensor(dev, coordinator))
-        if has_feature(dev, "details", "pm10"):
+        if has_feature(dev, "pm10"):
             entities.append(VeSyncPM10Sensor(dev, coordinator))
-        if has_feature(dev, "details", "filter_life"):
+        if has_feature(dev, "filter_life"):
             entities.append(VeSyncFilterLifeSensor(dev, coordinator))
-        if has_feature(dev, "details", "fan_rotate_angle"):
+        if has_feature(dev, "fan_rotate_angle"):
             entities.append(VeSyncFanRotateAngleSensor(dev, coordinator))
 
     async_add_entities(entities, update_before_add=True)
@@ -126,7 +126,7 @@ class VeSyncairfryerSensor(VeSyncBaseEntity, SensorEntity):
     @property
     def native_value(self):
         """Return the value."""
-        return getattr(self.airfryer, self.stype[5], None)
+        return getattr(self.airfryer.state, self.stype[5], None)
 
     @property
     def native_unit_of_measurement(self):
@@ -179,7 +179,7 @@ class VeSyncPowerSensor(VeSyncOutletSensorEntity):
     @property
     def native_value(self):
         """Return the current power usage in W."""
-        return self.smartplug.power
+        return self.smartplug.state.power
 
     @property
     def native_unit_of_measurement(self):
@@ -191,10 +191,10 @@ class VeSyncPowerSensor(VeSyncOutletSensorEntity):
         """Return the measurement state class."""
         return SensorStateClass.MEASUREMENT
 
-    def update(self):
+    async def async_update(self):
         """Update outlet details and energy usage."""
-        self.smartplug.update()
-        self.smartplug.update_energy()
+        await self.smartplug.update()
+        await self.smartplug.update_energy()
 
 
 class VeSyncEnergySensor(VeSyncOutletSensorEntity):
@@ -223,7 +223,7 @@ class VeSyncEnergySensor(VeSyncOutletSensorEntity):
     @property
     def native_value(self):
         """Return the today total energy usage in kWh."""
-        return self.smartplug.energy_today
+        return self.smartplug.state.energy
 
     @property
     def native_unit_of_measurement(self):
@@ -235,10 +235,10 @@ class VeSyncEnergySensor(VeSyncOutletSensorEntity):
         """Return the total_increasing state class."""
         return SensorStateClass.TOTAL_INCREASING
 
-    def update(self):
+    async def async_update(self):
         """Update outlet details and energy usage."""
-        self.smartplug.update()
-        self.smartplug.update_energy()
+        await self.smartplug.update()
+        await self.smartplug.update_energy()
 
 
 class VeSyncHumidifierSensorEntity(VeSyncBaseEntity, SensorEntity):
@@ -285,8 +285,8 @@ class VeSyncAirQualitySensor(VeSyncHumidifierSensorEntity):
     @property
     def native_value(self):
         """Return the air quality index."""
-        if has_feature(self.smarthumidifier, "details", "air_quality"):
-            quality = self.smarthumidifier.details["air_quality"]
+        if has_feature(self.smarthumidifier, "air_quality"):
+            quality = self.smarthumidifier.state.air_quality
             if isinstance(quality, (int, float)):
                 return quality
             _LOGGER.warning(
@@ -328,8 +328,8 @@ class VeSyncAirQualityPercSensor(VeSyncHumidifierSensorEntity):
     @property
     def native_value(self):
         """Return the air quality percentage."""
-        if has_feature(self.smarthumidifier, "details", "aq_percent"):
-            quality = self.smarthumidifier.details["aq_percent"]
+        if has_feature(self.smarthumidifier, "aq_percent"):
+            quality = self.smarthumidifier.state.aq_percent
             if isinstance(quality, (int, float)):
                 return quality
             _LOGGER.warning(
@@ -365,8 +365,8 @@ class VeSyncAirQualityValueSensor(VeSyncHumidifierSensorEntity):
     @property
     def native_value(self):
         """Return the air quality index."""
-        if has_feature(self.smarthumidifier, "details", "air_quality_value"):
-            quality_value = self.smarthumidifier.details["air_quality_value"]
+        if has_feature(self.smarthumidifier, "air_quality_value"):
+            quality_value = self.smarthumidifier.state.air_quality_value
             if isinstance(quality_value, (int, float)):
                 return quality_value
             _LOGGER.warning(
@@ -402,8 +402,8 @@ class VeSyncPM1Sensor(VeSyncHumidifierSensorEntity):
     @property
     def native_value(self):
         """Return the PM1."""
-        if has_feature(self.smarthumidifier, "details", "pm1"):
-            quality_value = self.smarthumidifier.details["pm1"]
+        if has_feature(self.smarthumidifier, "pm1"):
+            quality_value = self.smarthumidifier.state.pm1
             if isinstance(quality_value, (int, float)):
                 return quality_value
             _LOGGER.warning(
@@ -439,8 +439,8 @@ class VeSyncPM10Sensor(VeSyncHumidifierSensorEntity):
     @property
     def native_value(self):
         """Return the PM10."""
-        if has_feature(self.smarthumidifier, "details", "pm10"):
-            quality_value = self.smarthumidifier.details["pm10"]
+        if has_feature(self.smarthumidifier, "pm10"):
+            quality_value = self.smarthumidifier.state.pm10
             if isinstance(quality_value, (int, float)):
                 return quality_value
             _LOGGER.warning(
@@ -482,11 +482,7 @@ class VeSyncFilterLifeSensor(VeSyncHumidifierSensorEntity):
     @property
     def native_value(self):
         """Return the filter life index."""
-        return (
-            self.smarthumidifier.filter_life
-            if hasattr(self.smarthumidifier, "filter_life")
-            else self.smarthumidifier.details["filter_life"]
-        )
+        return self.smarthumidifier.state.filter_life
 
     @property
     def native_unit_of_measurement(self):
@@ -501,11 +497,7 @@ class VeSyncFilterLifeSensor(VeSyncHumidifierSensorEntity):
     @property
     def state_attributes(self):
         """Return the state attributes."""
-        return (
-            self.smarthumidifier.details["filter_life"]
-            if isinstance(self.smarthumidifier.details["filter_life"], dict)
-            else {}
-        )
+        return {}
 
     @property
     def icon(self):
@@ -543,11 +535,7 @@ class VeSyncFanRotateAngleSensor(VeSyncHumidifierSensorEntity):
     @property
     def native_value(self):
         """Return the fan rotate angle index."""
-        return (
-            self.smarthumidifier.fan_rotate_angle
-            if hasattr(self.smarthumidifier, "fan_rotate_angle")
-            else self.smarthumidifier.details["fan_rotate_angle"]
-        )
+        return self.smarthumidifier.state.fan_rotate_angle
 
     @property
     def native_unit_of_measurement(self):
@@ -590,7 +578,7 @@ class VeSyncHumiditySensor(VeSyncHumidifierSensorEntity):
     @property
     def native_value(self):
         """Return the current humidity in percent."""
-        return self.smarthumidifier.details["humidity"]
+        return self.smarthumidifier.state.humidity
 
     @property
     def native_unit_of_measurement(self):

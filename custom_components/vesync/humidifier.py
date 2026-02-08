@@ -5,8 +5,6 @@ from collections.abc import Mapping
 import logging
 from typing import Any
 
-from pyvesync.vesyncfan import VeSyncHumid200300S
-
 from homeassistant.components.humidifier import HumidifierEntity
 from homeassistant.components.humidifier.const import (
     MODE_AUTO,
@@ -102,7 +100,7 @@ class VeSyncHumidifierHA(VeSyncDevice, HumidifierEntity):
     _attr_max_humidity = MAX_HUMIDITY
     _attr_min_humidity = MIN_HUMIDITY
 
-    def __init__(self, humidifier: VeSyncHumid200300S, coordinator) -> None:
+    def __init__(self, humidifier, coordinator) -> None:
         """Initialize the VeSync humidifier device."""
         super().__init__(humidifier, coordinator)
         self.smarthumidifier = humidifier
@@ -129,17 +127,17 @@ class VeSyncHumidifierHA(VeSyncDevice, HumidifierEntity):
     @property
     def target_humidity(self) -> int:
         """Return the humidity we try to reach."""
-        return self.smarthumidifier.config["auto_target_humidity"]
+        return self.smarthumidifier.state.auto_target_humidity
 
     @property
     def mode(self) -> str | None:
         """Get the current preset mode."""
-        return _get_ha_mode(self.smarthumidifier.details["mode"])
+        return _get_ha_mode(self.smarthumidifier.state.mode)
 
     @property
     def is_on(self) -> bool:
         """Return True if humidifier is on."""
-        return self.smarthumidifier.enabled  # device_status is always on
+        return self.smarthumidifier.is_on
 
     @property
     def unique_info(self) -> str:
@@ -151,7 +149,7 @@ class VeSyncHumidifierHA(VeSyncDevice, HumidifierEntity):
         """Return the state attributes of the humidifier."""
 
         attr = {}
-        for k, v in self.smarthumidifier.details.items():
+        for k, v in self.smarthumidifier.state.to_dict().items():
             if k in VS_TO_HA_ATTRIBUTES:
                 attr[VS_TO_HA_ATTRIBUTES[k]] = v
             elif k in self.state_attributes:
@@ -160,39 +158,37 @@ class VeSyncHumidifierHA(VeSyncDevice, HumidifierEntity):
                 attr[k] = v
         return attr
 
-    def set_humidity(self, humidity: int) -> None:
+    async def async_set_humidity(self, humidity: int) -> None:
         """Set the target humidity of the device."""
         if humidity not in range(self.min_humidity, self.max_humidity + 1):
             raise ValueError(
                 "{humidity} is not between {self.min_humidity} and {self.max_humidity} (inclusive)"
             )
-        if self.smarthumidifier.set_humidity(humidity):
-            self.schedule_update_ha_state()
-        else:
+        if not await self.smarthumidifier.set_humidity(humidity):
             raise ValueError("An error occurred while setting humidity.")
+        self.schedule_update_ha_state()
 
-    def set_mode(self, mode: str) -> None:
+    async def async_set_mode(self, mode: str) -> None:
         """Set the mode of the device."""
         if mode not in self.available_modes:
             raise ValueError(
                 "{mode} is not one of the valid available modes: {self.available_modes}"
             )
-        if self.smarthumidifier.set_humidity_mode(_get_vs_mode(mode)):
-            self.schedule_update_ha_state()
-        else:
+        if not await self.smarthumidifier.set_mode(_get_vs_mode(mode)):
             raise ValueError("An error occurred while setting mode.")
+        self.schedule_update_ha_state()
 
-    def turn_on(
+    async def async_turn_on(
         self,
         **kwargs,
     ) -> None:
         """Turn the device on."""
-        success = self.smarthumidifier.turn_on()
+        success = await self.smarthumidifier.turn_on()
         if not success:
             raise ValueError("An error occurred while turning on.")
 
-    def turn_off(self, **kwargs) -> None:
+    async def async_turn_off(self, **kwargs) -> None:
         """Turn the device off."""
-        success = self.smarthumidifier.turn_off()
+        success = await self.smarthumidifier.turn_off()
         if not success:
             raise ValueError("An error occurred while turning off.")

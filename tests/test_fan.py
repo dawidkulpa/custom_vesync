@@ -1,7 +1,7 @@
 """Tests for VeSync fan platform."""
 
 import math
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -52,7 +52,8 @@ class TestVeSyncFanHA:
         """Support only SET_SPEED when speed_count is 1."""
         device = MagicMock()
         device.device_type = "TestFan"
-        device._config_dict = {"module": "VeSyncAirBypass", "levels": [1]}
+        device.fan_levels = [1]
+        device.modes = []
         device.cid = "test"
         device.sub_device_no = None
         device.device_name = "Test"
@@ -64,86 +65,86 @@ class TestVeSyncFanHA:
 
     def test_percentage_in_manual_mode(self, fan_entity, mock_fan_device):
         """Return percentage when in manual mode."""
-        mock_fan_device.mode = VS_MODE_MANUAL
-        mock_fan_device.fan_level = 2
+        mock_fan_device.state.mode = VS_MODE_MANUAL
+        mock_fan_device.state.fan_level = 2
         expected = ranged_value_to_percentage((1, 3), 2)
         assert fan_entity.percentage == expected
 
     def test_percentage_none_in_auto_mode(self, fan_entity, mock_fan_device):
         """Return None when not in manual mode."""
-        mock_fan_device.mode = VS_MODE_AUTO
+        mock_fan_device.state.mode = VS_MODE_AUTO
         assert fan_entity.percentage is None
 
     def test_preset_mode_returns_device_mode(self, fan_entity, mock_fan_device):
         """Return the current device mode."""
-        mock_fan_device.mode = VS_MODE_SLEEP
+        mock_fan_device.state.mode = VS_MODE_SLEEP
         assert fan_entity.preset_mode == VS_MODE_SLEEP
 
-    def test_set_percentage_turns_off_at_zero(self, fan_entity, mock_fan_device):
+    async def test_set_percentage_turns_off_at_zero(self, fan_entity, mock_fan_device):
         """Turn off the fan when percentage is 0."""
-        fan_entity.set_percentage(0)
+        await fan_entity.async_set_percentage(0)
         mock_fan_device.turn_off.assert_called_once()
 
-    def test_set_percentage_turns_on_if_off(self, fan_entity, mock_fan_device):
+    async def test_set_percentage_turns_on_if_off(self, fan_entity, mock_fan_device):
         """Turn on the fan if it is off when setting percentage."""
         mock_fan_device.is_on = False
-        fan_entity.set_percentage(50)
+        await fan_entity.async_set_percentage(50)
         mock_fan_device.turn_on.assert_called_once()
-        mock_fan_device.manual_mode.assert_called_once()
+        mock_fan_device.set_manual_mode.assert_called_once()
 
-    def test_set_percentage_sets_speed(self, fan_entity, mock_fan_device):
+    async def test_set_percentage_sets_speed(self, fan_entity, mock_fan_device):
         """Set the fan speed to the correct level."""
         mock_fan_device.is_on = True
-        fan_entity.set_percentage(100)
+        await fan_entity.async_set_percentage(100)
         expected_level = math.ceil(
             percentage_to_ranged_value((1, 3), 100)
         )
-        mock_fan_device.change_fan_speed.assert_called_with(expected_level)
+        mock_fan_device.set_fan_speed.assert_called_with(expected_level)
 
-    def test_set_preset_mode_auto(self, fan_entity, mock_fan_device):
+    async def test_set_preset_mode_auto(self, fan_entity, mock_fan_device):
         """Set auto mode on the device."""
         mock_fan_device.is_on = True
-        fan_entity.set_preset_mode(VS_MODE_AUTO)
-        mock_fan_device.auto_mode.assert_called_once()
+        await fan_entity.async_set_preset_mode(VS_MODE_AUTO)
+        mock_fan_device.set_auto_mode.assert_called_once()
 
-    def test_set_preset_mode_sleep(self, fan_entity, mock_fan_device):
+    async def test_set_preset_mode_sleep(self, fan_entity, mock_fan_device):
         """Set sleep mode on the device."""
         mock_fan_device.is_on = True
-        fan_entity.set_preset_mode(VS_MODE_SLEEP)
-        mock_fan_device.sleep_mode.assert_called_once()
+        await fan_entity.async_set_preset_mode(VS_MODE_SLEEP)
+        mock_fan_device.set_sleep_mode.assert_called_once()
 
-    def test_set_preset_mode_manual(self, fan_entity, mock_fan_device):
+    async def test_set_preset_mode_manual(self, fan_entity, mock_fan_device):
         """Set manual mode on the device."""
         mock_fan_device.is_on = True
-        fan_entity.set_preset_mode(VS_MODE_MANUAL)
-        mock_fan_device.manual_mode.assert_called_once()
+        await fan_entity.async_set_preset_mode(VS_MODE_MANUAL)
+        mock_fan_device.set_manual_mode.assert_called_once()
 
-    def test_set_invalid_preset_mode_raises(self, fan_entity):
+    async def test_set_invalid_preset_mode_raises(self, fan_entity):
         """Raise ValueError for invalid preset mode."""
         with pytest.raises(ValueError):
-            fan_entity.set_preset_mode("invalid_mode")
+            await fan_entity.async_set_preset_mode("invalid_mode")
 
-    def test_turn_on_with_preset_mode(self, fan_entity, mock_fan_device):
+    async def test_turn_on_with_preset_mode(self, fan_entity, mock_fan_device):
         """Turn on with preset mode delegates to set_preset_mode."""
         mock_fan_device.is_on = True
-        fan_entity.turn_on(preset_mode=VS_MODE_AUTO)
-        mock_fan_device.auto_mode.assert_called_once()
+        await fan_entity.async_turn_on(preset_mode=VS_MODE_AUTO)
+        mock_fan_device.set_auto_mode.assert_called_once()
 
-    def test_turn_on_with_percentage(self, fan_entity, mock_fan_device):
+    async def test_turn_on_with_percentage(self, fan_entity, mock_fan_device):
         """Turn on with specific percentage."""
         mock_fan_device.is_on = True
-        fan_entity.turn_on(percentage=75)
-        mock_fan_device.manual_mode.assert_called()
+        await fan_entity.async_turn_on(percentage=75)
+        mock_fan_device.set_manual_mode.assert_called()
 
-    def test_turn_on_default_percentage(self, fan_entity, mock_fan_device):
+    async def test_turn_on_default_percentage(self, fan_entity, mock_fan_device):
         """Turn on with default 50% when no arguments given."""
         mock_fan_device.is_on = True
-        fan_entity.turn_on()
-        mock_fan_device.manual_mode.assert_called()
+        await fan_entity.async_turn_on()
+        mock_fan_device.set_manual_mode.assert_called()
 
     def test_extra_state_attributes(self, fan_entity, mock_fan_device):
         """Return extra state attributes from device details."""
-        mock_fan_device.details = {"humidity": 45, "some_other": "value"}
+        mock_fan_device.state.to_dict = MagicMock(return_value={"humidity": 45, "some_other": "value"})
         attrs = fan_entity.extra_state_attributes
         # humidity gets remapped to current_humidity
         assert "current_humidity" in attrs
@@ -152,7 +153,8 @@ class TestVeSyncFanHA:
         """Set speed range to (1, 3) for LV-PUR131S."""
         device = MagicMock()
         device.device_type = "LV-PUR131S"
-        device._config_dict = {"module": "VeSyncAir131"}
+        device.fan_levels = []
+        device.modes = []
         device.cid = "test"
         device.sub_device_no = None
         device.device_name = "Purifier"

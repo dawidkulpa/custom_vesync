@@ -38,12 +38,12 @@ class TestVeSyncOutOfWaterSensor:
 
     def test_is_on_true(self, water_sensor, mock_humidifier_device):
         """Return True when water_lacks is True."""
-        mock_humidifier_device.details = {"water_lacks": True}
+        mock_humidifier_device.state.water_lacks = True
         assert water_sensor.is_on is True
 
     def test_is_on_false(self, water_sensor, mock_humidifier_device):
         """Return False when water_lacks is False."""
-        mock_humidifier_device.details = {"water_lacks": False}
+        mock_humidifier_device.state.water_lacks = False
         assert water_sensor.is_on is False
 
     def test_entity_category(self, water_sensor):
@@ -64,8 +64,8 @@ class TestVeSyncWaterTankLiftedSensor:
         assert tank_sensor.unique_id.endswith("-water_tank_lifted")
 
     def test_is_on(self, tank_sensor, mock_humidifier_device):
-        """Return water_tank_lifted from device details."""
-        mock_humidifier_device.details = {"water_tank_lifted": True}
+        """Return water_tank_lifted from device state."""
+        mock_humidifier_device.state.water_tank_lifted = True
         assert tank_sensor.is_on is True
 
 
@@ -82,7 +82,9 @@ class TestVeSyncFilterOpenStateSensor:
         device.device_type = "LAP-C201S"
         device.connection_status = "online"
         device.current_firm_version = "1.0"
-        device.details = {"filter_open_state": True}
+        state = MagicMock(spec=[])
+        state.filter_open_state = True
+        device.state = state
         return device
 
     @pytest.fixture
@@ -95,7 +97,7 @@ class TestVeSyncFilterOpenStateSensor:
         assert filter_sensor.unique_id.endswith("-filter-open-state")
 
     def test_is_on(self, filter_sensor, filter_device):
-        """Return filter_open_state from device details."""
+        """Return filter_open_state from device state."""
         assert filter_sensor.is_on is True
 
 

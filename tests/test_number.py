@@ -1,6 +1,6 @@
 """Tests for VeSync number platform."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -45,13 +45,13 @@ class TestVeSyncFanSpeedLevelHA:
 
     def test_native_value(self, speed_entity, mock_fan_device):
         """Return current speed from device."""
-        mock_fan_device.speed = 2
+        mock_fan_device.state.fan_level = 2
         assert speed_entity.native_value == 2
 
-    def test_set_native_value(self, speed_entity, mock_fan_device):
-        """Call change_fan_speed with integer value."""
-        speed_entity.set_native_value(3)
-        mock_fan_device.change_fan_speed.assert_called_once_with(3)
+    async def test_set_native_value(self, speed_entity, mock_fan_device):
+        """Call set_fan_speed with integer value."""
+        await speed_entity.async_set_native_value(3)
+        mock_fan_device.set_fan_speed.assert_called_once_with(3)
 
     def test_entity_category(self, speed_entity):
         """Return CONFIG entity category."""
@@ -90,9 +90,9 @@ class TestVeSyncHumidifierMistLevelHA:
         """Return mist_virtual_level from details."""
         assert mist_entity.native_value == 3
 
-    def test_set_native_value(self, mist_entity, mock_humidifier_device):
+    async def test_set_native_value(self, mist_entity, mock_humidifier_device):
         """Call set_mist_level with integer value."""
-        mist_entity.set_native_value(5)
+        await mist_entity.async_set_native_value(5)
         mock_humidifier_device.set_mist_level.assert_called_once_with(5)
 
 
@@ -119,12 +119,12 @@ class TestVeSyncHumidifierWarmthLevelHA:
         assert warmth_entity.native_max_value == 3
 
     def test_native_value(self, warmth_entity, mock_humidifier_device):
-        """Return warm_mist_level from details."""
+        """Return warm_mist_level from state."""
         assert warmth_entity.native_value == 0
 
-    def test_set_native_value(self, warmth_entity, mock_humidifier_device):
+    async def test_set_native_value(self, warmth_entity, mock_humidifier_device):
         """Call set_warm_level with integer value."""
-        warmth_entity.set_native_value(2)
+        await warmth_entity.async_set_native_value(2)
         mock_humidifier_device.set_warm_level.assert_called_once_with(2)
 
 
@@ -151,12 +151,12 @@ class TestVeSyncHumidifierTargetLevelHA:
         assert target_entity.native_max_value == 80
 
     def test_native_value(self, target_entity, mock_humidifier_device):
-        """Return auto_target_humidity from config."""
+        """Return auto_target_humidity from state."""
         assert target_entity.native_value == 55
 
-    def test_set_native_value(self, target_entity, mock_humidifier_device):
+    async def test_set_native_value(self, target_entity, mock_humidifier_device):
         """Call set_humidity with integer value."""
-        target_entity.set_native_value(60)
+        await target_entity.async_set_native_value(60)
         mock_humidifier_device.set_humidity.assert_called_once_with(60)
 
     def test_unit(self, target_entity):

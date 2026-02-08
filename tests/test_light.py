@@ -1,6 +1,6 @@
 """Tests for VeSync light platform."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -99,18 +99,18 @@ class TestVeSyncDimmableLightHA:
 
     def test_brightness(self, light_entity, mock_bulb_dimmable_device):
         """Return converted brightness value."""
-        mock_bulb_dimmable_device.brightness = 75
+        mock_bulb_dimmable_device.state.brightness = 75
         expected = _vesync_brightness_to_ha(75)
         assert light_entity.brightness == expected
 
-    def test_turn_on_no_args(self, light_entity, mock_bulb_dimmable_device):
+    async def test_turn_on_no_args(self, light_entity, mock_bulb_dimmable_device):
         """Turn on the light without arguments."""
-        light_entity.turn_on()
+        await light_entity.async_turn_on()
         mock_bulb_dimmable_device.turn_on.assert_called_once()
 
-    def test_turn_on_with_brightness(self, light_entity, mock_bulb_dimmable_device):
+    async def test_turn_on_with_brightness(self, light_entity, mock_bulb_dimmable_device):
         """Set brightness when turning on."""
-        light_entity.turn_on(**{ATTR_BRIGHTNESS: 200})
+        await light_entity.async_turn_on(**{ATTR_BRIGHTNESS: 200})
         mock_bulb_dimmable_device.set_brightness.assert_called_once()
         # Should NOT call turn_on (attribute_adjustment_only)
         mock_bulb_dimmable_device.turn_on.assert_not_called()
@@ -147,25 +147,25 @@ class TestVeSyncTunableWhiteLightHA:
 
     def test_color_temp_conversion(self, light_entity, mock_bulb_tunable_device):
         """Convert VeSync color temp percentage to mireds."""
-        mock_bulb_tunable_device.color_temp_pct = 50
+        mock_bulb_tunable_device.state.color_temp = 50
         result = light_entity.color_temp
         assert 154 <= result <= 370
 
     def test_color_temp_invalid_returns_zero(self, light_entity, mock_bulb_tunable_device):
         """Return 0 for non-numeric color temp values."""
-        mock_bulb_tunable_device.color_temp_pct = "invalid"
+        mock_bulb_tunable_device.state.color_temp = "invalid"
         assert light_entity.color_temp == 0
 
-    def test_turn_on_with_color_temp(self, light_entity, mock_bulb_tunable_device):
+    async def test_turn_on_with_color_temp(self, light_entity, mock_bulb_tunable_device):
         """Set color temp when turning on."""
-        light_entity.turn_on(**{ATTR_COLOR_TEMP: 250})
+        await light_entity.async_turn_on(**{ATTR_COLOR_TEMP: 250})
         mock_bulb_tunable_device.set_color_temp.assert_called_once()
         # Should NOT call turn_on (attribute_adjustment_only)
         mock_bulb_tunable_device.turn_on.assert_not_called()
 
-    def test_turn_on_with_both(self, light_entity, mock_bulb_tunable_device):
+    async def test_turn_on_with_both(self, light_entity, mock_bulb_tunable_device):
         """Set both color temp and brightness."""
-        light_entity.turn_on(**{ATTR_COLOR_TEMP: 250, ATTR_BRIGHTNESS: 200})
+        await light_entity.async_turn_on(**{ATTR_COLOR_TEMP: 250, ATTR_BRIGHTNESS: 200})
         mock_bulb_tunable_device.set_color_temp.assert_called_once()
         mock_bulb_tunable_device.set_brightness.assert_called_once()
         mock_bulb_tunable_device.turn_on.assert_not_called()
@@ -182,11 +182,13 @@ class TestVeSyncNightLightHA:
     @pytest.fixture
     def night_light_device(self, mock_fan_device):
         """Return a mock device with night light."""
-        mock_fan_device.night_light = True
-        mock_fan_device.details = {
-            "night_light": "on",
-            "night_light_brightness": 50,
-        }
+        mock_fan_device.supports_nightlight = True
+        mock_fan_device.supports_nightlight_brightness = False
+        mock_fan_device.state.nightlight_status = "on"
+        mock_fan_device.state.nightlight_brightness = 50
+        mock_fan_device.product_type = "fan"
+        mock_fan_device.set_nightlight_mode = AsyncMock()
+        mock_fan_device.set_nightlight_brightness = AsyncMock()
         return mock_fan_device
 
     @pytest.fixture
@@ -204,45 +206,47 @@ class TestVeSyncNightLightHA:
 
     def test_is_on_with_night_light_on(self, night_light_entity, night_light_device):
         """Return True when night_light is 'on'."""
-        night_light_device.details["night_light"] = "on"
+        night_light_device.state.nightlight_status = "on"
         assert night_light_entity.is_on is True
 
     def test_is_on_with_night_light_dim(self, night_light_entity, night_light_device):
         """Return True when night_light is 'dim'."""
-        night_light_device.details["night_light"] = "dim"
+        night_light_device.state.nightlight_status = "dim"
         assert night_light_entity.is_on is True
 
     def test_is_on_with_night_light_off(self, night_light_entity, night_light_device):
         """Return False when night_light is 'off'."""
-        night_light_device.details["night_light"] = "off"
+        night_light_device.state.nightlight_status = "off"
         assert night_light_entity.is_on is False
 
     def test_brightness_with_numeric(self, night_light_entity, night_light_device):
         """Return converted brightness for numeric night_light_brightness."""
-        night_light_device.details["night_light_brightness"] = 50
+        night_light_device.supports_nightlight_brightness = True
+        night_light_entity.has_brightness = True
+        night_light_device.state.nightlight_brightness = 50
         expected = _vesync_brightness_to_ha(50)
         assert night_light_entity.brightness == expected
 
-    def test_turn_on_fan_type_full(self, night_light_entity, night_light_device):
-        """Call set_night_light('on') for fan types at full brightness."""
-        night_light_device._config_dict = {"module": "VeSyncAirBypass"}
-        night_light_entity.turn_on(**{ATTR_BRIGHTNESS: 255})
-        night_light_device.set_night_light.assert_called_with("on")
+    async def test_turn_on_fan_type_full(self, night_light_entity, night_light_device):
+        """Call set_nightlight_mode('on') for fan types at full brightness."""
+        night_light_device.product_type = "fan"
+        await night_light_entity.async_turn_on(**{ATTR_BRIGHTNESS: 255})
+        night_light_device.set_nightlight_mode.assert_called_with("on")
 
-    def test_turn_on_fan_type_dim(self, night_light_entity, night_light_device):
-        """Call set_night_light('dim') for fan types at lower brightness."""
-        night_light_device._config_dict = {"module": "VeSyncAirBypass"}
-        night_light_entity.turn_on(**{ATTR_BRIGHTNESS: 100})
-        night_light_device.set_night_light.assert_called_with("dim")
+    async def test_turn_on_fan_type_dim(self, night_light_entity, night_light_device):
+        """Call set_nightlight_mode('dim') for fan types at lower brightness."""
+        night_light_device.product_type = "fan"
+        await night_light_entity.async_turn_on(**{ATTR_BRIGHTNESS: 100})
+        night_light_device.set_nightlight_mode.assert_called_with("dim")
 
-    def test_turn_off_fan_type(self, night_light_entity, night_light_device):
-        """Call set_night_light('off') for fan types."""
-        night_light_device._config_dict = {"module": "VeSyncAirBypass"}
-        night_light_entity.turn_off()
-        night_light_device.set_night_light.assert_called_with("off")
+    async def test_turn_off_fan_type(self, night_light_entity, night_light_device):
+        """Call set_nightlight_mode('off') for fan types."""
+        night_light_device.product_type = "fan"
+        await night_light_entity.async_turn_off()
+        night_light_device.set_nightlight_mode.assert_called_with("off")
 
-    def test_turn_on_non_fan_with_brightness(self, mock_coordinator):
-        """Call set_night_light_brightness for non-fan types."""
+    async def test_turn_on_non_fan_with_brightness(self, mock_coordinator):
+        """Call set_nightlight_brightness for non-fan types."""
         device = MagicMock()
         device.device_type = "LUH-D301S-WEU"
         device.cid = "test"
@@ -250,18 +254,23 @@ class TestVeSyncNightLightHA:
         device.device_name = "Humidifier"
         device.connection_status = "online"
         device.current_firm_version = "1.0"
-        device.night_light = True
-        device.details = {
-            "night_light_brightness": 50,
-        }
-        device._config_dict = {"module": "VeSyncHumid200300S"}
+        device.supports_nightlight = True
+        device.supports_nightlight_brightness = True
+        device.product_type = "humidifier"
+        state = MagicMock()
+        state.nightlight_brightness = 50
+        state.nightlight_status = "on"
+        state.brightness = 50
+        device.state = state
+        device.set_nightlight_brightness = AsyncMock()
+        device.set_nightlight_mode = AsyncMock()
 
         entity = VeSyncNightLightHA(device, mock_coordinator)
-        entity.turn_on(**{ATTR_BRIGHTNESS: 200})
-        device.set_night_light_brightness.assert_called_once()
+        await entity.async_turn_on(**{ATTR_BRIGHTNESS: 200})
+        device.set_nightlight_brightness.assert_called_once()
 
-    def test_turn_off_non_fan(self, mock_coordinator):
-        """Call set_night_light_brightness(0) for non-fan types."""
+    async def test_turn_off_non_fan(self, mock_coordinator):
+        """Call set_nightlight_brightness(0) for non-fan types."""
         device = MagicMock()
         device.device_type = "LUH-D301S-WEU"
         device.cid = "test"
@@ -269,12 +278,17 @@ class TestVeSyncNightLightHA:
         device.device_name = "Humidifier"
         device.connection_status = "online"
         device.current_firm_version = "1.0"
-        device.night_light = True
-        device.details = {
-            "night_light_brightness": 50,
-        }
-        device._config_dict = {"module": "VeSyncHumid200300S"}
+        device.supports_nightlight = True
+        device.supports_nightlight_brightness = True
+        device.product_type = "humidifier"
+        state = MagicMock()
+        state.nightlight_brightness = 50
+        state.nightlight_status = "on"
+        state.brightness = 50
+        device.state = state
+        device.set_nightlight_brightness = AsyncMock()
+        device.set_nightlight_mode = AsyncMock()
 
         entity = VeSyncNightLightHA(device, mock_coordinator)
-        entity.turn_off()
-        device.set_night_light_brightness.assert_called_with(0)
+        await entity.async_turn_off()
+        device.set_nightlight_brightness.assert_called_with(0)

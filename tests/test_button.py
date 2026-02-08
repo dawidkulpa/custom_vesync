@@ -28,7 +28,7 @@ class TestVeSyncAirfryerButton:
         """Return the stop icon."""
         assert button_entity.icon == "mdi:stop"
 
-    def test_press_calls_end(self, button_entity, mock_airfryer_device):
+    async def test_press_calls_end(self, button_entity, mock_airfryer_device):
         """Delegate press to device.end."""
-        button_entity.press()
+        await button_entity.async_press()
         mock_airfryer_device.end.assert_called_once()
