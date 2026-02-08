@@ -1,12 +1,9 @@
 
-# **Important message**
-> 
-> This a fork of the existing archived project created by vlebourl. Please contribute here.
+# VeSync custom component for Home Assistant
+
+> This is a fork of [micahqcade/custom_vesync](https://github.com/micahqcade/custom_vesync), created due to lack of maintenance in the upstream repository and the need to upgrade dependencies — most notably migrating from `pyvesync==2.1.12` to `pyvesync==3.4.1` for the async API — to keep compatibility with the newest Home Assistant.
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/custom-components/hacs)
-[![GitHub release](https://img.shields.io/github/v/release/vlebourl/custom_vesync.svg)](https://GitHub.com/vlebourl/custom_vesync/releases/)
-
-# VeSync custom component for Home Assistant
 
 Custom component for Home Assistant to interact with smart devices via the VeSync platform.
 This integration is heavily based on [VeSync_bpo](https://github.com/borpin/vesync-bpo) and relies on [pyvesync](https://github.com/webdjoe/pyvesync) under the hood.
@@ -45,13 +42,6 @@ logger:
     pyvesync: debug
 ```
 
-## TODO LIST
-```
-- [x] Air Fryer Properties (AirFryer158)
-- [ ] Air Fryer Methods
-- [ ] Create the Card
-```
-
 ### Contributing
 
 All contributions are very welcomed!
@@ -62,4 +52,3 @@ pip install pre-commit
 pre-commit install
 pre-commit run --all-files
 ```
-
